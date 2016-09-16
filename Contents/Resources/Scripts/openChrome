@@ -1,0 +1,103 @@
+#!/usr/bin/python
+# Copyright 2014 Alex K (wtwf.com)
+
+"""
+open chrome for a specific profile
+
+see https://crbug.com/549275
+
+usage: openChrome profileName [chrome_options] http://cnn.com/
+
+We'll try really hard to fine a profile name so give the name in the
+user selector or the email address of the google accoun.
+
+use this with some applescript and http://www.rubicode.com/Software/RCDefaultApp/
+http://superuser.com/questions/373701/create-bash-script-to-open-url-in-mac-os-x
+http://apple.stackexchange.com/questions/32386/how-to-register-an-applescript-as-a-potential...
+"""
+
+__author__ = 'wtwf.com (Alex K)'
+
+import getopt
+import json
+import logging
+import os
+import re
+import subprocess
+import sys
+
+PROFILE_DIR = os.path.expanduser("~/Library/Application Support/Google/Chrome")
+
+CHROME_BIN="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+
+def Usage(code, msg=''):
+  """Show a usage message."""
+  if code:
+    fd = sys.stderr
+  else:
+    fd = sys.stdout
+  PROGRAM = os.path.basename(sys.argv[0]) # pylint: disable=invalid-name,unused-variable
+  print >> fd, __doc__ % locals()
+  if msg:
+    print >> fd, msg
+  sys.exit(code)
+
+def OpenUrlInProfile(profile, url):
+  """Open up a url in a specific profile window"""
+  logging.info("profile %s url %s", profile, url)
+  subprocess.call([CHROME_BIN, url, '--profile-directory=%s' % profile])
+  subprocess.call(["open", "-a", "Google Chrome"])  # to get focus
+
+def GetProfileMap():
+  profile_map = {}
+  for dir in os.listdir(PROFILE_DIR):
+    prefs_file_name = os.path.join(PROFILE_DIR, dir, "Preferences")
+    if os.path.exists(prefs_file_name):
+      prefs = json.load(open(prefs_file_name))
+      for acct in prefs.get("account_info") or []:
+        if acct.has_key("email"):
+          profile_map[acct["email"]] = dir
+  return profile_map
+
+def GetProfilesConfig():
+  return json.load(open(os.path.expanduser("~/.openchromerc")))
+
+def OpenUrl(url):
+  """Choose a profile to open this url in."""
+
+  profile_map = GetProfileMap()
+
+  profile = None
+  for profile in GetProfilesConfig():
+    pattern = profile.get("pattern")
+    if not pattern or re.search(pattern, url, re.VERBOSE | re.IGNORECASE):
+      break
+
+  profile = profile_map[profile["email"]]
+
+  OpenUrlInProfile(profile, url)
+
+def Main():
+  """Run."""
+  logging.basicConfig() # filename='/tmp/openChrome.log')
+  logging.getLogger().setLevel(logging.DEBUG)
+  try:
+    opts, args = getopt.getopt(sys.argv[1:], 'h', 'help'.split(','))
+  except getopt.error, msg:
+    Usage(1, msg)
+
+  if len(args) != 1:
+    Usage(1)
+
+  url = args[0]
+  for opt, arg in opts:
+    if opt in ('-h', '--help'):
+      Usage(0)
+
+  if not url:
+    Usage(2, 'you must provide a url')
+
+  OpenUrl(url)
+
+if __name__ == '__main__':
+  Main()
