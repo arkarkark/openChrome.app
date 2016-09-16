@@ -44,17 +44,16 @@ def OpenUrlInProfile(profile, url):
   subprocess.call([CHROME_BIN, url, '--profile-directory=%s' % profile])
   subprocess.call(["open", "-a", "Google Chrome"])  # to get focus
 
-def GetProfileMap():
+def GetProfileDirForEmailAddress(email):
   """A map from email address to profile directory name."""
-  profile_map = {}
   for dir in os.listdir(PROFILE_DIR):
     prefs_file_name = os.path.join(PROFILE_DIR, dir, "Preferences")
     if os.path.exists(prefs_file_name):
       prefs = json.load(open(prefs_file_name))
       for acct in prefs.get("account_info") or []:
-        if acct.has_key("email"):
-          profile_map[acct["email"]] = dir
-  return profile_map
+        if acct.has_key("email") and acct["email"] == email:
+          return dir
+  return None
 
 def GetOpenChromeRc():
   """a simple json file with an object (see README.md)."""
@@ -85,8 +84,7 @@ def OpenUrl(url):
   elif profile.has_key("profile"):
     profile = profile["profile"]
   elif profile.has_key("email"):
-    profile_map = GetProfileMap()
-    profile = profile_map[profile["email"]]
+    profile = GetProfileDirForEmailAddress(profile["email"])
   else:
     logging.fatal(".openchromerc entry must have either `profile` or `email` entry")
 
