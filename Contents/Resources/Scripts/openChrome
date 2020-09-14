@@ -6,8 +6,9 @@ Open Chrome in a profile based on URL pattern matching, see https://github.com/a
 
 Usage: openChrome http://facebook.com/
 
+Set as your default web opener with https://github.com/Lord-Kamina/SwiftDefaultApps/releases
+
 also see https://crbug.com/549275
-use this with some applescript and http://www.rubicode.com/Software/RCDefaultApp/
 http://superuser.com/questions/373701/create-bash-script-to-open-url-in-mac-os-x
 http://apple.stackexchange.com/questions/32386/how-to-register-an-applescript-as-a-potential...
 """
@@ -27,55 +28,55 @@ CHROME_BIN = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 DEFAULT_PROFILE = "Default"
 
 
-def Usage(code, msg=""):
+def usage(code, msg=""):
     """Show a usage message."""
     if code:
-        fd = sys.stderr
+        out = sys.stderr
     else:
-        fd = sys.stdout
-    PROGRAM = os.path.basename(
+        out = sys.stdout
+    PROGRAM = os.path.basename(  # pylint: disable=invalid-name,possibly-unused-variable
         sys.argv[0]
-    )  # pylint: disable=invalid-name,unused-variable
-    print >> fd, __doc__ % locals()
+    )
+    print >> out, __doc__ % locals()
     if msg:
-        print >> fd, msg
+        print >> out, msg
     sys.exit(code)
 
 
-def OpenUrlInProfile(profile, url):
+def open_url_in_profile(profile, url):
     """Open up a url in a specific profile window"""
     logging.info("profile %s url %s", profile, url)
     subprocess.call([CHROME_BIN, url, "--profile-directory=%s" % profile])
     subprocess.Popen(["open", "-a", "Google Chrome"])  # to get focus
 
 
-def GetProfileDirForEmailAddress(email):
+def get_profile_dir_for_email_address(email):
     """A map from email address to profile directory name."""
-    for dir in os.listdir(PROFILE_DIR):
-        prefs_file_name = os.path.join(PROFILE_DIR, dir, "Preferences")
+    for dirname in os.listdir(PROFILE_DIR):
+        prefs_file_name = os.path.join(PROFILE_DIR, dirname, "Preferences")
         if os.path.exists(prefs_file_name):
             prefs = json.load(open(prefs_file_name))
             for acct in prefs.get("account_info") or []:
                 if acct.has_key("email") and acct["email"] == email:
-                    return dir
+                    return dirname
     return None
 
 
-def GetOpenChromeRc():
+def get_open_chrome_rc():
     """a simple json file with an object (see README.md)."""
     return json.load(open(os.path.expanduser("~/.openchromerc")))
 
 
-def OpenUrl(url):
+def open_url(url):
     """Choose a profile to open this url in."""
     global PROFILE_DIR, CHROME_BIN
 
-    rc = GetOpenChromeRc()
+    config = get_open_chrome_rc()
 
-    PROFILE_DIR = os.path.expanduser(rc.get("profileDirectory", PROFILE_DIR))
-    CHROME_BIN = os.path.expanduser(rc.get("chromeBinary", CHROME_BIN))
-    if rc.has_key("rules"):
-        rules = rc["rules"]
+    PROFILE_DIR = os.path.expanduser(config.get("profileDirectory", PROFILE_DIR))
+    CHROME_BIN = os.path.expanduser(config.get("chromeBinary", CHROME_BIN))
+    if config.has_key("rules"):
+        rules = config["rules"]
     else:
         logging.fatal(
             "~/.openchromerc must have `rules`, see https://github.com/arkarkark/openChrome.app"
@@ -87,15 +88,16 @@ def OpenUrl(url):
         pattern = rule.get("pattern")
         if not pattern or re.search(pattern, url, re.VERBOSE | re.IGNORECASE):
             break
+        profile = None
 
     if not rule:
         profile = DEFAULT_PROFILE
     elif rule.has_key("profile"):
         profile = rule["profile"]
     elif rule.has_key("email"):
-        profile = GetProfileDirForEmailAddress(rule["email"])
+        profile = get_profile_dir_for_email_address(rule["email"])
     elif rule.has_key("run"):
-        OpenShell(rule["run"], url)
+        open_shell(rule["run"], url)
         return
     else:
         logging.fatal(
@@ -103,35 +105,35 @@ def OpenUrl(url):
             rule,
         )
     if profile:
-        OpenUrlInProfile(profile, url)
+        open_url_in_profile(profile, url)
     else:
         logging.fatal("Unable to find profile for: %r", rule)
 
 
-def Main():
+def main():
     """Run."""
     logging.basicConfig()  # filename='/tmp/openChrome.log')
     logging.getLogger().setLevel(logging.DEBUG)
     try:
         opts, args = getopt.getopt(sys.argv[1:], "h", "help".split(","))
     except getopt.error as msg:
-        Usage(1, msg)
+        usage(1, msg)
 
     if len(args) != 1:
-        Usage(1)
+        usage(1)
 
     url = args[0]
-    for opt, arg in opts:
+    for opt, _ in opts:
         if opt in ("-h", "--help"):
-            Usage(0)
+            usage(0)
 
     if not url:
-        Usage(2, "you must provide a url")
+        usage(2, "you must provide a url")
 
-    OpenUrl(url)
+    open_url(url)
 
 
-def OpenShell(cmds, url):
+def open_shell(cmds, url):
     """Choose a profile to open this url in."""
     cmds = [item % locals() for item in cmds]
     logging.info("Opening: %r", cmds)
@@ -139,4 +141,4 @@ def OpenShell(cmds, url):
 
 
 if __name__ == "__main__":
-    Main()
+    main()

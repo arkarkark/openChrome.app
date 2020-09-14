@@ -2,7 +2,7 @@
 
 Opens URLs in various chrome profiles/users based on pattern matching.
 
-If you install http://www.rubicode.com/Software/RCDefaultApp/ you can set this app as your default URL opener.
+If you install [SwiftDefaultApps](https://github.com/Lord-Kamina/SwiftDefaultApps/releases) you can set this app as your default URL opener.
 
 ## ~/.openchromerc
 
